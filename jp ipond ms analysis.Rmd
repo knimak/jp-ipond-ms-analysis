@@ -1,0 +1,1451 @@
+---
+title: "jp ipond analysis"
+output: html_document
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## load libraries before start
+
+ggsave( "volcanoe for meeee.tiff", plot = NCclone5, width = 8 , height =6, dpi = 1000)
+
+write_xlsx(tablesummary, "C:\\Users\\Junqi Pan\\OneDrive\\Desktop\\Ipond table summary.xlsx")
+
+
+```{r}
+
+
+install.packages("gplots")
+install.packages("heatmap.plus")
+install.packages("RColorBrewer")
+install.packages("writexl")
+install.packages("Rtools")
+
+
+library(tidyverse)
+library(readxl)
+library(gt)
+library(gtsummary)
+library(broom)
+library(emmeans)
+library(corrr)
+library(janitor)
+library(forcats)
+library(car)
+library(ggplot2)
+
+
+
+
+library(gplots)
+library(RColorBrewer)
+
+
+library(tidyr)
+
+```
+
+## Read in the data
+
+
+
+```{r}
+ library(readxl)
+
+jpms <- read_excel("junqi ms analysis  (1).xlsx")
+View(jpms)
+
+
+library(dplyr)
+
+numeric_columns <- sapply(jpms, is.numeric)
+
+# Replace NA values with 0 only in numeric columns
+jpmsnais0<- jpms[numeric_columns][is.na(jpms[numeric_columns])] <- 0
+
+
+
+
+jpmsp24log2 <- log2(jpms$AbundancesP24)
+jpmsp48log2 <- log2(jpms$AbundancesP48)
+jpms524log2 <- log2(jpms$Abundances524)
+jpms548log2 <- log2(jpms$Abundances548)
+jpms624log2 <- log2(jpms$Abundances624)
+jpms648log2 <- log2(jpms$Abundances648)
+jpmsT24log2 <- log2(jpms$AbundancesT24)
+jpmsT48log2 <- log2(jpms$AbundancesT48)
+
+jpms524foldchange <- jpms524log2 - jpmsp24log2
+jpms624foldchange <- jpms624log2 - jpmsp24log2
+jpms548foldchange <- jpms548log2 - jpmsp48log2
+jpms648foldchange <- jpms648log2 - jpmsp48log2
+jpmsP24foldchange <- jpmsp24log2 - jpmsT24log2
+jpmsP48foldchange <- jpmsp48log2 - jpmsT48log2
+
+install.packages("wesanderson")
+
+library(wesanderson)
+```
+
+
+
+### Create the foldchange table with log2 changes by minus p+24 and p+48, respectively
+
+```{r}
+ tablesummary <- data.frame(
+ Gene = jpms$Gene, 
+  Foldchange_524 = jpms524foldchange,
+Foldchange_624 = jpms624foldchange,
+ Foldchange_548 = jpms548foldchange,
+Foldchange_648 = jpms648foldchange )
+View(tablesummary)
+
+ tablesummaryforActivefork <- data.frame(
+ Gene = jpms$Gene,Foldchange_P24 = jpmsP24foldchange,
+Foldchange_P48 = jpmsP48foldchange)
+View(tablesummaryforActivefork)
+
+ tablesummaryforPCNAandH3 <- data.frame(
+ Gene = jpms$Gene,ipond_Thymidine_24hours = jpmsT24log2,
+ipond_Thymidine_48hours = jpmsT48log2,
+ipond_pCLIP_24hours = jpmsp24log2,
+ipond_pCLIP_48hours = jpmsp48log2,
+ipond_grDNA_Clone5_24hours = jpms524log2,
+ipond_grDNA_Clone5_48hours = jpms548log2,
+ipond_grDNA_Clone6_24hours = jpms624log2,
+ipond_grDNA_Clone6_48hours= jpms648log2)
+View(tablesummaryforPCNAandH3)
+
+
+```
+
+```{r}
+library(RColorBrewer)
+
+# Define the color palette from RColorBrewer
+# "Set1" is an example; you can choose other palettes such as "Set2", "Dark2", etc.
+color_palette <- brewer.pal(n = 8, name = "BrBG")
+
+
+```
+
+
+```{r}
+PCNA1 <- c("PCNA")
+PCNA <- subset(tablesummaryforPCNAandH3, Gene %in% PCNA1 )
+
+
+h31 <- c("H3C1; H3C10; H3C11; H3C12; H3C2; H3C3; H3C4; H3C6; H3C7; H3C8")
+H3 <- subset(tablesummaryforPCNAandH3, Gene %in% h31 )
+
+melted_data_H3<- pivot_longer(H3, cols = starts_with("ipond"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+melted_data_H3$Foldchange <- factor(melted_data_H3$Foldchange,
+                                      levels = c("ipond_Thymidine_24hours",
+                                                 "ipond_Thymidine_48hours",
+                                                 "ipond_pCLIP_24hours",
+                                                 "ipond_pCLIP_48hours",
+                                                 "ipond_grDNA_Clone5_24hours",
+                                                 "ipond_grDNA_Clone5_48hours",
+                                                 "ipond_grDNA_Clone6_24hours",
+                                                 "ipond_grDNA_Clone6_48hours"))
+
+melted_data_PCNA <- pivot_longer(PCNA, cols = starts_with("ipond"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+melted_data_PCNA$Foldchange <- factor(melted_data_PCNA$Foldchange,
+                                      levels = c("ipond_Thymidine_24hours",
+                                                 "ipond_Thymidine_48hours",
+                                                 "ipond_pCLIP_24hours",
+                                                 "ipond_pCLIP_48hours",
+                                                 "ipond_grDNA_Clone5_24hours",
+                                                 "ipond_grDNA_Clone5_48hours",
+                                                 "ipond_grDNA_Clone6_24hours",
+                                                 "ipond_grDNA_Clone6_48hours"))
+
+
+
+
+
+
+
+# Define the Royal1 color palette
+PCNA_bar_graph2 <- ggplot(melted_data_PCNA, aes(x = Foldchange, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), alpha = 0.7, width = 0.5, color ='black') +
+  labs(x = "", y = "Log2 Abundance ", fill = "Samples") +
+  ggtitle("PCNA") +
+  scale_y_continuous(limits = c(0, 30), breaks = seq(0, 30, by = 5)) +  
+  scale_fill_manual(values = c("ipond_Thymidine_24hours" = color_palette[1], "ipond_Thymidine_48hours" = color_palette[2], 
+                               "ipond_pCLIP_24hours" = color_palette[3], "ipond_pCLIP_48hours" = color_palette[4], 
+                               "ipond_grDNA_Clone5_24hours" = color_palette[5], "ipond_grDNA_Clone5_48hours" = color_palette[6],
+                               "ipond_grDNA_Clone6_24hours" = color_palette[7], "ipond_grDNA_Clone6_48hours" = color_palette[8]), 
+                    labels = c("Thymidine 24 hours", "Thymidine 48 hours", "pCLIP 24 hours", "pCLIP 48 hours", "grDNA#5 24 hours", "grDNA#5 48 hours", "grDNA#6 24 hours", "grDNA#6 48 hours")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_PCNA$Gene)) - 0.5, by = 1), color = "black", size = 1) + 
+  geom_hline(yintercept = c(0,-1, -2), linetype = "solid", color = "black", size = 1) +  
+  geom_text(aes(label = sprintf("%.1f", Log2change)), position = position_dodge(width = 0.9), vjust = -1.5, size = 3)  + 
+  my_theme
+
+# Print the plot
+print(PCNA_bar_graph2)
+
+
+
+
+H3_bar_graph2 <- ggplot(melted_data_H3, aes(x = Foldchange, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), alpha = 0.7, width = 0.5, color ='black') +
+  labs(x = "", y = "Log2 Abundance ", fill = "Samples") +
+  ggtitle("Histone 3") +
+  scale_y_continuous(limits = c(0, 35), breaks = seq(0, 35, by = 5)) +  
+  scale_fill_manual(values = c("ipond_Thymidine_24hours" = color_palette[1], "ipond_Thymidine_48hours" = color_palette[2], 
+                               "ipond_pCLIP_24hours" = color_palette[3], "ipond_pCLIP_48hours" = color_palette[4], 
+                               "ipond_grDNA_Clone5_24hours" = color_palette[5], "ipond_grDNA_Clone5_48hours" = color_palette[6],
+                               "ipond_grDNA_Clone6_24hours" = color_palette[7], "ipond_grDNA_Clone6_48hours" = color_palette[8]), 
+                    labels = c("Thymidine 24 hours", "Thymidine 48 hours", "pCLIP 24 hours", "pCLIP 48 hours", "grDNA#5 24 hours", "grDNA#5 48 hours", "grDNA#6 24 hours", "grDNA#6 48 hours")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_PCNA$Gene)) - 0.5, by = 1), color = "black", size = 1) + 
+  geom_hline(yintercept = c(0,-1, -2), linetype = "solid", color = "black", size = 1) +  
+  geom_text(aes(label = sprintf("%.1f", Log2change)), position = position_dodge(width = 0.9), vjust = -1.5, size = 3)  + 
+  my_theme
+
+# Print the plot
+print(H3_bar_graph2)
+
+
+ggsave( "Bar graph for all smaples pcna.tiff", plot = PCNA_bar_graph2, width = 12 , height =6, dpi = 1500)
+ggsave( "Bar graph for all smaples Histone3.tiff", plot = H3_bar_graph2, width = 12 , height =6, dpi = 1500)
+```
+
+
+
+```{r}
+library("writexl")
+
+
+
+
+```
+### identify active fork and chromatin markers.
+
+```{r}
+ATRactivation1 <- c("ATR", "ATRIP", "TOPBP1", "RAD9A", "HUS1", "RPA1", "RPA2", "RPA3")
+ATRactivation <- subset(tablesummaryforActivefork, Gene %in% ATRactivation1 )
+View(ATRactivation)
+
+DNArepair1 <- c("MRE11", "RAD50", "NBN", "ATM", "MDC1", "53BP1", "RIF1", "FANCI", "FANCD2", "FANCA", "FANCB", "FANCG", "FANCJ", "BRCA1", "BARD1", "ABRAXAS", "BRCC1","MERIT40", "BRCC45", "RAP80","RAD51", "RAD54L", "MMS22L", "TONSL","BLM","TOP3A", "RMI1", "SMARCAL1", "WRN", "EXO1","RAD21","SMC1A", "SMC3","STAG1","STAG2","PDS5", "WAPL","CDCA5", "MSH2", "MSH3", "MLH1","MSH6")
+DNArepair <- subset(tablesummaryforActivefork, Gene %in% DNArepair1 )
+View(DNArepair)
+
+Corereplisome1 <- c( "MCM2", "MCM3", "MCM4", "MCM5", "MCM6", "MCM7","MCM10","CDC45", "GINS1","GINS3", "GINS4", "TIMELESS", "CLSPN","RFC1", "RFC2", "RFC3", "RFC4", "RFC5","PCNA" ,"PAF15", "AND1","POLA2", "POLA3", "POLA1","PRIM1", "PRIM2","POLD1","POLD2","POLD3","POLE","POLE2", "RPA1", "RPA2","RPA3", "FEN1","LIG1","LIG3", "MMS22L","SLF1","SLF2", "RAD18", "RNASEH2A", "RNASEH2B","WDHD1", "TIPIN","CTF","WSTF","SNF2L1", "GTF2L")
+Core_replisome1 <- subset(tablesummaryforActivefork, Gene %in% Corereplisome1 )
+View(Core_replisome1)
+
+Corereplisome2 <- c("MRE11", "RAD50", "NBN", "MLH1", "MSH6", "MSH2", "MSH3",  "USP7", "DTL", "WIZ", "EHMT2", "CHAF1A","CHAF1B", "SUPT16H", "SSRP1", "CTF18", "DSCC1","FAM111A", "ATAD5", "PARG", "PARP2", "EXO1","RECQL5","FANCA", "USP1","UNG","SMARCAL1","TOPBP1" ,"HIRIP3", "SKIV2L2", "TRIM33","CFDP1", "NACC1","ATXN10","TCEA1", "SUPT15H","GLP", "G9A","MRE11A", "SNF2H", "PPM1E","ZNF24", "ATAD5")
+Core_replisome2 <- subset(tablesummaryforActivefork, Gene %in% Corereplisome2 )
+View(Core_replisome2)
+
+
+Corereplisome <- c("MCM2", "MCM3", "MCM4", "MCM5", "MCM6", "MCM7", "MCM10", "CDC45", "GINS1", "GINS3", "GINS4", "TIMELESS", "CLSPN", "RFC1", "RFC2", "RFC3", "RFC4", "RFC5", "PCNA", "PAF15", "AND1", "POLA1", "POLA2", "POLA3", "PRIM1", "PRIM2", "POLD1", "POLD2", "POLD3", "POLE", "POLE2", "RPA1", "RPA2", "RPA3", "LIG1", "LIG3", "FEN1", "EXO1",  "RECQL5", "SMARCAL1", "MRE11", "RAD50", "NBN", "MLH1", "MSH2", "MSH3", "MSH6", "FANCA", "USP1", "UNG", "RAD18", "RNASEH2A", "RNASEH2B", "WDHD1", "SLF1", "SLF2", "PARP2", "PARG", "ATAD5", "CHAF1A", "CHAF1B", "EHMT2", "GLP", "SUPT16H", "SSRP1", "SNF2H", "SNF2L1", "WSTF", "GTF2L", "TCEA1", "SUPT15H", "HIRIP3", "SKIV2L2", "TRIM33", "CFDP1", "NACC1", "ATXN10")
+Core_replisome <- subset(tablesummaryforActivefork, Gene %in% Corereplisome )
+View(Core_replisome)
+
+Activefork2 <- c("PCNA", "WDHD1", "PRIM1", "PRIM2", "POLA1", "POLA2", "POLA3", "RPA1", "RPA2", "RFC1", "RFC2", "RFC3", "RFC4", "RFC5", "TIPIN", "TIMELESS", "FEN1","MSH2", "MSH3", "MSH6","CHAF1A", "CHAF1B", "CTF", "LIG1","PRIM2","EXO1", "RNASEH2B", "GINS3", "SUPT15H", "SSRP1","WIZ","GLP", "DNMT1","G9A","MRE11A","RAD50", "WSTF","SNF2L1", "GTF2L", "SNF2H", "PPM1E","ZNF24", "ATAD5","DNAJA1","ATXN10","TCEA1")
+Activefork_markers <- subset(tablesummaryforActivefork, Gene %in% Activefork2 )
+View(Activefork_markers)
+
+CYto <- c("ACTB", "ACTIN1", "VCL", "FLNB", "FLNC", "SPEPTIN", "TES", "ZYX", "MYH9", "S100A6", "ANLN")
+Cytoskeleton_networks <- subset(tablesummaryforActivefork, Gene %in% CYto )
+View(Cytoskeleton_networks)
+
+
+
+
+Chromatin_marker1 <- c("H1-0", "H1-10", "H1-2", "H1-3", "H1-4", "H1-5", "H2AC1", "H2AC20", "H2AC21", "H2AC4;H2AC8", "H2AX", "H2AZ2", "H2BC1", "H2BC12", "H2BC13", "H2BC18", "H2BC20P", "H2BC21", "H2BK1", "H3-3A; H3-3B", "H3-7", 
+              "	H3C1; H3C10; H3C11; H3C12; H3C2; H3C3; H3C4; H3C6; H3C7; H3C8", 
+              "H4C1; H4C11; H4C12; H4C13; H4C14; H4C15; H4C16; H4C2; H4C3; H4C4; H4C5; H4C6; H4C8; H4C9","MACROH2A1",
+              "MACROH2A2","HMG20A","HMGA2","HMGA1","HP1BP3","BANF1","LMNB1","RPL17","RPL15","RPL29","RPL13","                       RPL18","DMD","NUCKS1","MDC1","SNRPA1","SARS","Hells","CENPV")
+Chromatin_Marker <- subset(tablesummaryforActivefork, Gene %in% Chromatin_marker1)
+
+
+
+```
+
+```{r}
+Corereplisome <- c("MCM2", "MCM3", "MCM4", "MCM5", "MCM6", "MCM7", "MCM10", "CDC45", "GINS1", "GINS3", "GINS4", "TIMELESS", "CLSPN", "RFC1", "RFC2", "RFC3", "RFC4", "RFC5", "PCNA", "PAF15", "AND1", "POLA1", "POLA2", "POLA3", "PRIM1", "PRIM2", "POLD1", "POLD2", "POLD3", "POLE", "POLE2", "RPA1", "RPA2", "RPA3", "LIG1", "LIG3", "FEN1", "EXO1",  "RECQL5", "SMARCAL1", "MRE11", "RAD50", "NBN", "MLH1", "MSH2", "MSH3", "MSH6", "FANCA", "USP1", "UNG", "RAD18", "RNASEH2A", "RNASEH2B", "WDHD1", "SLF1", "SLF2", "PARP2", "PARG", "ATAD5", "CHAF1A", "CHAF1B", "EHMT2", "GLP", "SUPT16H", "SSRP1", "SNF2H", "SNF2L1", "WSTF", "GTF2L", "TCEA1", "SUPT15H", "HIRIP3", "SKIV2L2", "TRIM33", "CFDP1",  "ATXN10")
+Core_replisome <- subset(tablesummaryforActivefork, Gene %in% Corereplisome )
+View(Core_replisome)
+
+genes_ordered <- c("MCM2", "MCM3", "MCM4", "MCM5", "MCM6", "MCM7", "MCM10", 
+                   "CDC45", "GINS1", "GINS3", "GINS4", "TIMELESS", "CLSPN", 
+                   "RFC1", "RFC2", "RFC3", "RFC4", "RFC5", "PCNA", "PAF15", 
+                   "AND1", "POLA1", "POLA2", "POLA3", "PRIM1", "PRIM2", 
+                   "POLD1", "POLD2", "POLD3", "POLE", "POLE2", "RPA1", 
+                   "RPA2", "RPA3", "LIG1", "LIG3", "FEN1", "EXO1",  
+                   "RECQL5", "SMARCAL1", "MRE11", "RAD50", "NBN", "MLH1", 
+                   "MSH2", "MSH3", "MSH6", "FANCA", "USP1", "UNG", "RAD18", 
+                   "RNASEH2A", "RNASEH2B", "WDHD1", "SLF1", "SLF2", "PARP2", 
+                   "PARG", "ATAD5", "CHAF1A", "CHAF1B", "EHMT2", "GLP", 
+                   "SUPT16H", "SSRP1", "SNF2H", "SNF2L1", "WSTF", "GTF2L", 
+                   "TCEA1", "SUPT15H", "HIRIP3", "SKIV2L2", "TRIM33", 
+                   "CFDP1", "NACC1", "ATXN10")
+
+melted_data_Core_replisome <- pivot_longer(Core_replisome, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+
+
+melted_data_Core_replisome$Log2change[melted_data_Core_replisome$Log2change == Inf] <- 7
+melted_data_Core_replisome$Log2change[melted_data_Core_replisome$Log2change == -Inf] <- -7
+
+
+# Ensure the Gene column is a factor with levels set in the desired order
+melted_data_Core_replisome$Gene <- factor(melted_data_Core_replisome$Gene, levels = genes_ordered)
+
+# Generate the bar graph
+Core_replisome_bar_graph <- ggplot(melted_data_Core_replisome, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), alpha = 1.5, width = 0.5) +
+  labs(x = "Gene IDs", y = "log2 Abundance Change", fill = "colour") +
+  ggtitle("Core Replisome") +
+  scale_y_continuous(limits = c(-2, 7), breaks = seq(-2, 7, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_P24" = "orange", "Foldchange_P48" = "blue4")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Core_replisome$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) +  
+  scale_fill_manual(values = c("orange", "blue4"), labels = c("24 hours", "48 hours")) +
+  geom_hline(yintercept = c(0, 1, -1, 2, 3, 4, 5, 6, 7, -2), linetype = "dashed", color = "grey60", size = 0.2) + 
+  my_theme
+
+print(Core_replisome_bar_graph)
+```
+
+```{r}
+melted_data_Core_replisome_TT <- read_excel("Ipond melted_data_Core_replisome_T.xlsx")
+
+my_theme <- theme(
+  axis.title = element_text(size = 12, face="bold"),
+  axis.text.x = element_text(color="black", size = 10, angle = 45, hjust = 1),
+  axis.text.y = element_text(size = 10),
+  plot.title = element_text(size = 15, face="bold", hjust=.5),
+  strip.text = element_text(size = 16),
+  plot.margin = margin(1,1,1,1,"cm"),
+  panel.background = element_rect(fill = "white", colour = "white"),
+  panel.grid.major.x = element_blank(),
+  panel.grid.minor.x = element_blank(),
+  panel.grid.major.y = element_line(color = "white"),
+  panel.grid.minor.y = element_line(color = "white"))
+
+melted_data_Core_replisome_TT$Gene <- factor(melted_data_Core_replisome_TT$Gene, levels = genes_ordered)
+
+# Generate the bar graph
+Core_replisome_bar_graph <- ggplot(melted_data_Core_replisome_TT, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), alpha = 1.5, width = 0.5) +
+  labs(x = "Gene IDs", y = "log2 Abundance Change", fill = "colour") +
+  ggtitle("Core Replisome") +
+  scale_y_continuous(limits = c(-2, 3), breaks = seq(-2, 3, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_P24" = "orange", "Foldchange_P48" = "blue4")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Core_replisome_TT$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) +  
+  scale_fill_manual(values = c("orange", "blue4"), labels = c("24 hours", "48 hours")) +
+  geom_hline(yintercept = c(0, 1, -1, 2, 3, -2), linetype = "dashed", color = "grey60", size = 0.2) + 
+  my_theme
+
+print(Core_replisome_bar_graph)
+
+
+Core_replisome_bar_graph <- ggplot(melted_data_Core_replisome_TT, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), alpha = 1.6, width = 0.5) +
+  labs(x = "Gene IDs", y = "log2 Abundance Change", fill = "colour") +
+  ggtitle("Core Replisome") +
+  scale_y_continuous(limits = c(-2, 3), breaks = seq(-2, 3, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_524" = "#17becf", "Foldchange_624" = "#ff6347")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Core_replisome_TT$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) +  
+  scale_fill_manual(values = c("#17becf", "#ff6347"), labels = c("TRINISC Clone5", "TRINISC Clone6")) +
+  geom_hline(yintercept = c(0, 1, -1, 2, 3,  -2), linetype = "dashed", color = "grey60", size = 0.2) + 
+  coord_flip() + # This line flips the coordinates
+  my_theme
+
+print(Core_replisome_bar_graph)
+
+ggsave( "pclip VS TRINISCI Corereplisome.tiff", plot = Core_replisome_bar_graph, width = 6 , height =10, dpi = 600)
+```
+```{r}
+melted_data_Core_replisome_tables <- split(melted_data_Core_replisome, melted_data_Core_replisome$Foldchange)
+
+melted_data_Core_replisome_tables_P24 <- melted_data_Core_replisome_tables$Foldchange_P24
+```
+
+
+
+```{r}
+melted_data_Core_replisome$Gene <- factor(melted_data_Core_replisome$Gene, levels = genes_ordered)
+
+melted_data_Core_replisome$Gene <- factor(melted_data_Core_replisome$Gene, levels = genes_ordered)
+
+# Generate the bar graph
+Core_replisome_bar_graph <- ggplot(melted_data_Core_replisome_tables_P24, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), alpha = 1.6, width = 0.3) +
+  labs(x = "Gene IDs", y = "log2 Abundance Change", fill = "Foldchange") +
+  ggtitle("Core Replisome") +
+  scale_y_continuous(limits = c(-2, 7), breaks = seq(-2, 7, by = 1)) +  
+  scale_fill_manual(values = c("brown"), labels = c("pCLIP active fork at 24 hours")) +
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Core_replisome$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) +  
+  geom_hline(yintercept = c(0, 1, -1, 2, 3, 4, 5, 6, 7, -2), linetype = "dashed", color = "grey60", size = 0.2) + 
+  coord_flip() + # This line flips the coordinates
+  my_theme
+
+print(Core_replisome_bar_graph)
+
+
+
+ggsave( "pclip VS Thymidine Corereplisome.tiff", plot = Core_replisome_bar_graph, width = 6 , height =10, dpi = 600)
+
+
+```
+
+
+
+ggsave( "pclip VS Thymidine Corereplisome.tiff", plot = Core_replisome_bar_graph, width = 6 , height =10, dpi = 600)
+
+
+### make bar graph for each condition 
+```{r}
+library(ggplot2)
+library(tidyr)
+
+
+
+melted_data_ATRactivation <- pivot_longer(ATRactivation, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+
+
+melted_data_ATRactivation$Log2change[is.infinite(melted_data_ATRactivation$Log2change)] <- 7
+
+
+ATRactivation_bar_graph <- ggplot(melted_data_ATRactivation, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.5), alpha = 0.9, width = 0.5) +
+  labs(x = "Gene IDs", y = "log2 Abundance Change",fill = "colour") +
+  ggtitle("ATR Activation ") +
+  scale_y_continuous(limits = c(-1, 7), breaks = seq(-1, 7, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_P24" = "orange", "Foldchange_P48" = "blue4")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_ATRactivation$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) +  scale_fill_manual(values = c("orange", "blue4"), labels = c("24 hours", "48 hours")) +
+  geom_hline(yintercept = c(0, 1, -1,2,3,4,5,6,7), linetype = "dashed", color = "grey60", size = 0.2) + 
+      scale_x_discrete(expand = expansion(mult = c(0.3, 0.3))) +  
+  my_theme
+
+
+print(ATRactivation_bar_graph)
+
+melted_data_Cytoskeleton_networks <- pivot_longer(Cytoskeleton_networks, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+
+
+melted_data_Cytoskeleton_networks$Log2change[is.infinite(melted_data_Cytoskeleton_networks$Log2change)] <- 7
+
+
+Cytoskeleton_networks_bar_graph <- ggplot(melted_data_Cytoskeleton_networks, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.5), alpha = 0.9, width = 0.5) +
+  labs(x = "Gene IDs", y = "log2 Abundance Change",fill = "colour") +
+  ggtitle("Cytoskeleton Networks ") +
+  scale_y_continuous(limits = c(-1, 1), breaks = seq(-1, 1, by = 0.5)) +  
+  scale_fill_manual(values = c("Foldchange_P24" = "orange", "Foldchange_P48" = "blue4")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Cytoskeleton_networks$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) +  scale_fill_manual(values = c("orange", "blue4"), labels = c("24 hours", "48 hours")) +
+  geom_hline(yintercept = c(-0.5, 0, 0.5 , 1, -1), linetype = "dashed", color = "grey60", size = 0.2) + 
+     scale_x_discrete(expand = expansion(mult = c(0.2, 0.2))) + 
+  my_theme
+
+
+print(Cytoskeleton_networks_bar_graph)
+
+
+melted_data_DNArepair <- pivot_longer(DNArepair, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+
+
+melted_data_DNArepair$Log2change[melted_data_DNArepair$Log2change == Inf] <- 7
+melted_data_DNArepair$Log2change[melted_data_DNArepair$Log2change == -Inf] <- -7
+
+
+DNArepair_bar_graph <- ggplot(melted_data_DNArepair, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), alpha = 0.9, width = 0.5) +
+  labs(x = "Gene IDs", y = "log2 Abundance Change",fill = "colour") +
+  ggtitle("DNA Repair ") +
+  scale_y_continuous(limits = c(-7, 7), breaks = seq(-7, 7, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_P24" = "orange", "Foldchange_P48" = "blue4")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_DNArepair$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) +  scale_fill_manual(values = c("orange", "blue4"), labels = c("24 hours", "48 hours")) +
+  geom_hline(yintercept = c(0, 1, -1,2,3,4,5,6,7,-2,-3,-4,-5,-6,-7), linetype = "dashed", color = "grey60", size = 0.2) + 
+  my_theme
+
+
+print(DNArepair_bar_graph)
+
+
+
+
+melted_data_Core_replisome1 <- pivot_longer(Core_replisome1, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+
+
+
+
+melted_data_Core_replisome1$Log2change[melted_data_Core_replisome1$Log2change == Inf] <- 7
+melted_data_Core_replisome1$Log2change[melted_data_Core_replisome1$Log2change == -Inf] <- -7
+
+
+Core_replisome1_bar_graph <- ggplot(melted_data_Core_replisome1, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), alpha = 1.5, width = 0.5) +
+  labs(x = "Gene IDs", y = "log2 Abundance Change",fill = "colour") +
+  ggtitle("Core Replisome (1) ") +
+  scale_y_continuous(limits = c(-2, 7), breaks = seq(-2, 7, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_P24" = "orange", "Foldchange_P48" = "blue4")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Core_replisome1$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) +  scale_fill_manual(values = c("orange", "blue4"), labels = c("24 hours", "48 hours")) +
+  geom_hline(yintercept = c(0, 1, -1,2,3,4,5,6,7,-2), linetype = "dashed", color = "grey60", size = 0.2) + 
+  my_theme
+
+
+print(Core_replisome1_bar_graph)
+
+
+melted_data_Core_replisome2 <- pivot_longer(Core_replisome2, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+
+
+melted_data_Core_replisome2$Log2change[melted_data_Core_replisome2$Log2change == Inf] <- 7
+melted_data_Core_replisome2$Log2change[melted_data_Core_replisome2$Log2change == -Inf] <- -7
+
+Core_replisome2_bar_graph <- ggplot(melted_data_Core_replisome2, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), alpha = 0.9, width = 0.5) +
+  labs(x = "Gene IDs", y = "log2 Abundance Change",fill = "colour") +
+  ggtitle("Core Replisome (2) ") +
+  scale_y_continuous(limits = c(-2, 7), breaks = seq(-2, 7, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_P24" = "orange", "Foldchange_P48" = "blue4")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Core_replisome2$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) +  scale_fill_manual(values = c("orange", "blue4"), labels = c("24 hours", "48 hours")) +
+  geom_hline(yintercept = c(0, 1, -1,2,3,4,5,6,7,-2), linetype = "dashed", color = "grey60", size = 0.2) + 
+  my_theme
+
+
+print(Core_replisome2_bar_graph)
+
+ggsave( "pclip VS Thymidine Corereplisome1.tiff", plot = Core_replisome1_bar_graph, width = 10 , height =6, dpi = 2000)
+
+ggsave( "pclip VS Thymidine Corereplisome2.tiff", plot = Core_replisome2_bar_graph, width = 10 , height =6, dpi = 2000)
+
+
+```
+
+
+
+
+
+```{r}
+Core_replisome2_bar_graph <- ggplot(melted_data_Core_replisome2, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), alpha = 0.9, width = 0.5) +
+    geom_bar_pattern(stat = "identity", position = position_dodge(width = 0.7), alpha = 0.9, width = 0.5,
+                   color = "black", 
+                   pattern_fill = "black",
+                   pattern_angle = 45,
+                   pattern_density = 0.1,
+                   pattern_spacing = 0.025,
+                   pattern_key_scale_factor = 0.6,
+  )+
+  labs(x = "Gene IDs", y = "log2 Abundance Change",fill = "colour") +
+  ggtitle("Core Replisome (2) ") +
+  scale_y_continuous(limits = c(-2, 7), breaks = seq(-2, 7, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_P24" = "orange", "Foldchange_P48" = "blue4")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Core_replisome2$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) +  scale_fill_manual(values = c("orange", "blue4"), labels = c("24 hours", "48 hours")) +
+  geom_hline(yintercept = c(0, 1, -1,2,3,4,5,6,7,-2), linetype = "dashed", color = "grey60", size = 0.2) + 
+  my_theme +
+ theme(legend.position = "right")
+
+print(Core_replisome2_bar_graph)
+
+```
+```{r}
+geom_bar_pattern(stat = "identity", position = position_dodge(width = 0.7), alpha = 0.9, width = 0.5,
+                   pattern = "stripe", 
+                   pattern_fill = "black", 
+                   pattern_angle = 45, 
+                   pattern_density = 0.1, 
+                   pattern_spacing = 0.025, 
+                   pattern_key_scale_factor = 0.6,
+                   aes(pattern = ifelse(Foldchange == "Foldchange_P48", "stripe", NA)))
+
+geom_col_pattern(
+    aes(pattern = Foldchange == "Foldchange_P48"),
+    fill = "white",
+    colour = "black",
+    pattern_density = 0.5,
+    pattern_fill = "black",
+    pattern_colour = "darkgrey"
+  ) +
+    geom_bar_pattern(aes(pattern_density = pattern_density), stat = "identity", position = position_dodge(width = 0.7), alpha = 0.9, width = 0.5,
+                   pattern = "stripe", 
+                   pattern_fill = "black", 
+                   pattern_angle = 45, 
+                   pattern_spacing = 0.025, 
+                   pattern_key_scale_factor = 0.6)
+
+
+```
+
+```{r}
+
+
+```
+
+
+
+
+```{r}
+
+
+melted_data_Activefork_markers <- pivot_longer(Activefork_markers, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+
+
+melted_data_Activefork_markers$Log2change[is.infinite(melted_data_Activefork_markers$Log2change)] <- 7
+
+
+Activefork_markers_bar_graph <- ggplot(melted_data_Activefork_markers, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), alpha = 0.9) +
+  labs(x = "Gene IDS", y = "log2 Abundance Change",fill = "colour") +
+  ggtitle("Active fork markers") +
+  scale_y_continuous(limits = c(-1, 7), breaks = seq(-1, 7, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_P24" = "orange", "Foldchange_P48" = "blue4")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Activefork_markers$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) +  scale_fill_manual(values = c("red", "blue4"), labels = c("24 hours", "48 hours")) +
+  geom_hline(yintercept = c(0, 1, -1,2,3,4,5,6,7), linetype = "dashed", color = "grey60", size = 0.2) + 
+  my_theme
+
+
+print(Activefork_markers_bar_graph)
+
+
+melted_data_Chromatin_Marker <- pivot_longer(Chromatin_Marker, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+melted_data_Chromatin_Marker$Gene[melted_data_Chromatin_Marker$Gene == "H4C1; H4C11; H4C12; H4C13; H4C14; H4C15; H4C16; H4C2; H4C3; H4C4; H4C5; H4C6; H4C8; H4C9"] <- "H4 Family"
+
+Chromatin_Markers_bar_graph <- ggplot(melted_data_Chromatin_Marker, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), alpha = 0.9) +
+  labs(x = "Gene symbols", y = "log2 Abundance Change",fill = "colour") +
+  ggtitle("Chromatin markers") +
+  scale_y_continuous(limits = c(-4, 1), breaks = seq(-4, 1, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_P24" = "red", "Foldchange_P48" = "blue")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Chromatin_Marker$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) +  scale_fill_manual(values = c("red", "blue"), labels = c("24 hours", "48 hours")) +geom_hline(yintercept = c(0, 1, -1,-2,-3,-4), linetype = "dashed", color = "black", size = 0.5) + 
+  my_theme
+
+
+print(Chromatin_Markers_bar_graph)
+
+
+
+
+```
+
+### Identify top increase or decrease hits with cut off >/< 1
+
+```{r}
+
+install.packages("gplots")
+library(gplots)
+install.packages("plotly")
+library(plotly)
+install.packages("reshape2")
+library(reshape2)
+library(dplyr)
+library(knitr)
+
+```
+
+
+```{r}
+filtered_data_increase <- tablesummaryforActivefork %>% filter(Foldchange_P24 > 1 & Foldchange_P48 > 1)
+selected_genes_increase <- unique(filtered_data_increase$Gene)
+subset_data_increase <- filtered_data_increase %>% filter(Gene %in% selected_genes_increase)
+kable(subset_data_increase[, c("Gene", "Foldchange_P24", "Foldchange_P48")], align = c("l", "r", "r"), caption = "Selected Genes with Foldchange Values >1 ")
+
+
+```
+
+
+```{r}
+
+filtered_data <- tablesummaryforActivefork %>% filter(Foldchange_P24 < -0.58 & Foldchange_P48 < -0.58 )
+selected_genes <- unique(filtered_data$Gene)
+subset_data <- filtered_data %>% filter(Gene %in% selected_genes)
+kable(subset_data[, c("Gene",  "Foldchange_P24","Foldchange_P48")], align = c("l", "r", "r"), caption = "Selected Genes with Foldchange Values <-1 ")
+
+
+
+
+```
+
+
+### Seperate replisome, chromatin remodellers, Topoisomerase and Histones.  
+
+```{r}
+
+Replisome1 <- c("PCNA", "MCM2", "MCM3", "MCM4", "MCM5", "MCM6", "MCM7", "WDHD1", "PRIM1", "PRIM2", "POLA1", "POLA2", "POLA3", "RPA1", "RPA2", "RFC1", "RFC2", "RFC3", "RFC4", "RFC5", "TIPIN", "TIMELESS", "FEN1")
+Replisome <- subset(tablesummary, Gene %in% Replisome1)
+View(Replisome)
+                               
+
+Chromatin1 <- c("ARID1A", "SMARCB1", "SMARCE1", "PBRM1", "SMARCA4", "SMARCC1", "SMARCC2", "SMARCD1", "SMARCD2", "ACTL6A", "BAZ1A", "RBBP4", "RBBP7", "BPTF", "BAZ2A", "SMARCA5",   "TRRAP", "RUVBL1", "RUVBL2")
+Chromatin_remodeller <- subset(tablesummary, Gene %in% Chromatin1)
+View(Chromatin_remodeller )
+
+Topos1 <- c("TOP1", "TOP2A", "TOP2B" )
+Topoisomerase <- subset(tablesummary, Gene %in% Topos1)
+View(Topoisomerase)
+
+Histones1 <- c("H1-0", "H1-10", "H1-2", "H1-3", "H1-4", "H1-5", "H2AC1", "H2AC20", "H2AC21", "H2AC4;H2AC8", "H2AX", "H2AZ2", "H2BC1", "H2BC12", "H2BC13", "H2BC18", "H2BC20P", "H2BC21", "H2BK1", "H3-3A; H3-3B", "H3-7", 
+              "	H3C1; H3C10; H3C11; H3C12; H3C2; H3C3; H3C4; H3C6; H3C7; H3C8", 
+              "H4C1; H4C11; H4C12; H4C13; H4C14; H4C15; H4C16; H4C2; H4C3; H4C4; H4C5; H4C6; H4C8; H4C9" )
+Histones <- subset(tablesummary, Gene %in% Histones1)
+
+View(Histones)
+
+
+
+```
+
+Corereplisome1_T <- c( "MCM2", "MCM3", "MCM4", "MCM5", "MCM6", "MCM7","MCM10","CDC45", "GINS1","GINS3", "GINS4", "TIMELESS", "CLSPN","RFC1", "RFC2", "RFC3", "RFC4", "RFC5","PCNA" ,"PAF15", "AND1","POLA2", "POLA3", "POLA1","PRIM1", "PRIM2","POLD1","POLD2","POLD3","POLE","POLE2", "RPA1", "RPA2","RPA3", "FEN1","LIG1","LIG3", "MMS22L","SMC5","SLF1","SLF2", "RAD18", "RNASEH2A", "RNASEH2B","WDHD1", "TIPIN","CTF","WSTF","SNF2L1", "GTF2L")
+Core_replisome1_T <- subset(tablesummary, Gene %in% Corereplisome1_T )
+View(Core_replisome1_T)
+
+Corereplisome2_T <- c("MRE11", "RAD50", "NBN", "MLH1", "MSH6", "MSH2", "MSH3", "CUL4B", "USP7", "DTL", "CDYL", "WIZ", "EHMT2", "DNMT1", "SMARCA5", "RBBP4", "CHAF1A","CHAF1B", "SUPT16H", "SSRP1","BAZ1B", "GTF2I", "CTF18", "DSCC1","FAM111A","BRD4", "ATAD5", "PARG", "PARP2", "EXO1","RECQL5","FANCA", "USP1","UNG","SMARCAL1","TOPBP1", "TOP2A","HIRIP3", "MDN1", "SKIV2L2", "TRIM33","CFDP1", "NACC1","KIFC1","ATXN10","TCEA1", "SUPT15H","GLP", "G9A","MRE11A", "SNF2H", "PPM1E","ZNF24", "ATAD5")
+Core_replisome2_T <- subset(tablesummary, Gene %in% Corereplisome2_T )
+View(Core_replisome2_T)
+
+
+```{r}
+
+
+
+
+Corereplisome1_T <- c("MCM2", "MCM3", "MCM4", "MCM5", "MCM6", "MCM7","MCM10","CDC45", "GINS1","GINS3", "GINS4", "TIMELESS", "CLSPN","RFC1", "RFC2", "RFC3", "RFC4", "RFC5","PCNA" ,"PAF15", "AND1","POLA2", "POLA3", "POLA1","PRIM1", "PRIM2","POLD1","POLD2","POLD3","POLE","POLE2", "RPA1", "RPA2","RPA3", "FEN1","LIG1","LIG3", "MMS22L","SLF1","SLF2", "RAD18", "RNASEH2A", "RNASEH2B","WDHD1", "TIPIN","CTF","WSTF","SNF2L1", "GTF2L")
+Core_replisome1_T <- subset(tablesummary, Gene %in% Corereplisome1_T )
+View(Core_replisome1_T)
+
+Corereplisome2_T <- c("MRE11", "RAD50", "NBN", "MLH1", "MSH6", "MSH2", "MSH3",  "USP7", "DTL", "WIZ", "EHMT2", "CHAF1A","CHAF1B", "SUPT16H", "SSRP1", "CTF18", "DSCC1","FAM111A", "ATAD5", "PARG", "PARP2", "EXO1","RECQL5","FANCA", "USP1","UNG","SMARCAL1","TOPBP1" ,"HIRIP3", "SKIV2L2", "TRIM33","CFDP1", "NACC1","ATXN10","TCEA1", "SUPT15H","GLP", "G9A","MRE11A", "SNF2H", "PPM1E","ZNF24", "ATAD5")
+Core_replisome2_T <- subset(tablesummary, Gene %in% Corereplisome2_T )
+View(Core_replisome2_T)
+
+Corereplisome_T <- c("MCM2", "MCM3", "MCM4", "MCM5", "MCM6", "MCM7", "MCM10", "CDC45", "GINS1", "GINS3", "GINS4", "TIMELESS", "CLSPN", "RFC1", "RFC2", "RFC3", "RFC4", "RFC5", "PCNA", "PAF15", "AND1", "POLA1", "POLA2", "POLA3", "PRIM1", "PRIM2", "POLD1", "POLD2", "POLD3", "POLE", "POLE2", "RPA1", "RPA2", "RPA3", "LIG1", "LIG3", "FEN1", "EXO1",  "RECQL5", "SMARCAL1", "MRE11", "RAD50", "NBN", "MLH1", "MSH2", "MSH3", "MSH6", "FANCA", "USP1", "UNG", "RAD18", "RNASEH2A", "RNASEH2B", "WDHD1", "SLF1", "SLF2", "PARP2", "PARG", "ATAD5", "CHAF1A", "CHAF1B", "EHMT2", "GLP", "SUPT16H", "SSRP1", "SNF2H", "SNF2L1", "WSTF", "GTF2L", "TCEA1", "SUPT15H", "HIRIP3", "SKIV2L2", "TRIM33", "CFDP1",  "ATXN10")
+Core_replisome_T <- subset(tablesummary, Gene %in% Corereplisome_T )
+View(Core_replisome_T)
+
+genes_ordered <- c("MCM2", "MCM3", "MCM4", "MCM5", "MCM6", "MCM7", "MCM10", 
+                   "CDC45", "GINS1", "GINS3", "GINS4", "TIMELESS", "CLSPN", 
+                   "RFC1", "RFC2", "RFC3", "RFC4", "RFC5", "PCNA", "PAF15", 
+                   "AND1", "POLA1", "POLA2", "POLA3", "PRIM1", "PRIM2", 
+                   "POLD1", "POLD2", "POLD3", "POLE", "POLE2", "RPA1", 
+                   "RPA2", "RPA3", "LIG1", "LIG3", "FEN1", "EXO1",  
+                   "RECQL5", "SMARCAL1", "MRE11", "RAD50", "NBN", "MLH1", 
+                   "MSH2", "MSH3", "MSH6", "FANCA", "USP1", "UNG", "RAD18", 
+                   "RNASEH2A", "RNASEH2B", "WDHD1", "SLF1", "SLF2", "PARP2", 
+                   "PARG", "ATAD5", "CHAF1A", "CHAF1B", "EHMT2", "GLP", 
+                   "SUPT16H", "SSRP1", "SNF2H", "SNF2L1", "WSTF", "GTF2L", 
+                   "TCEA1", "SUPT15H", "HIRIP3", "SKIV2L2", "TRIM33", 
+                   "CFDP1", "NACC1", "ATXN10")
+
+
+
+
+melted_data_Core_replisome_T <- pivot_longer(Core_replisome_T, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+
+
+melted_data_Core_replisome1_T$Log2change[melted_data_Core_replisome_T$Log2change == Inf] <- 7
+melted_data_Core_replisome1_T$Log2change[melted_data_Core_replisome_T$Log2change == -Inf] <- -7
+
+```
+
+
+
+```{r}
+melted_data_Core_replisome1_T <- pivot_longer(Core_replisome1_T, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+
+
+melted_data_Core_replisome1_T$Log2change[melted_data_Core_replisome1_T$Log2change == Inf] <- 7
+melted_data_Core_replisome1_T$Log2change[melted_data_Core_replisome1_T$Log2change == -Inf] <- -7
+
+melted_data_Core_replisome2_T <- pivot_longer(Core_replisome2_T, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+
+
+melted_data_Core_replisome2_T$Log2change[melted_data_Core_replisome2_T$Log2change == Inf] <- 7
+melted_data_Core_replisome2_T$Log2change[melted_data_Core_replisome2_T$Log2change == -Inf] <- -7
+
+
+
+
+my_theme <- theme(
+  axis.title.x = element_text(size = 10),
+  axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
+  axis.title.y = element_text(size = 10),
+  axis.text.y = element_text(size = 10),
+  plot.title = element_text(size = 15),
+  strip.text = element_text(size = 16),  
+  panel.background = element_rect(fill = "white", colour = "white"),
+  panel.grid.major.x = element_blank(),
+  panel.grid.minor.x = element_blank(),
+  panel.grid.major.y = element_line(color = "white"),
+  panel.grid.minor.y = element_line(color = "white"))
+
+Core_replisome1_T_bar_graph <- ggplot(melted_data_Core_replisome1_T, aes(x = Gene, y = Log2change, fill = Foldchange )) +
+  geom_bar(stat = "identity", position = position_dodge(width = 1), alpha = 200, width = 0.9) +
+  labs(x = "Gene symbols", y = "log2 Abundance Change",fill = "Foldchange") +
+  ggtitle("Core Replisome (1.T) ") +
+  scale_y_continuous(limits = c(-7, 3), breaks = seq(-7, 3, by = 1)) +  
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Core_replisome1_T$Gene)) - 0.5, by = 1), color = "grey8", size = 0.05) +
+  scale_fill_manual(values = c("Foldchange_524" = "orange", "Foldchange_624" = "orange4", "Foldchange_548" = "blue", "Foldchange_648" = "navyblue"),
+                    labels = c("clone 5 24 hours", "clone5 48 hours","clone6 24 hours",  "clone6 48 hours"))  +
+  geom_hline(yintercept = c(0, 1, -1,2,3,-3,-2,-4,-5,-6,-7), linetype = "dashed", color = "grey50", size = 0.05) +
+  my_theme +
+  theme(legend.position = "right")
+
+print(Core_replisome1_T_bar_graph)
+
+
+```
+
+
+```{r}
+library(tidyverse)
+library(ggpattern)
+library(readxl)
+
+melted_data_Core_replisome_T$Foldchange <- factor(melted_data_Core_replisome_T$Foldchange, 
+                          levels = c("Foldchange_524", "Foldchange_624",
+                                     "Foldchange_548", "Foldchange_648"))
+melted_data_Core_replisome_T$stripe <- ifelse(melted_data_Core_replisome_T$Foldchange %in% c("Foldchange_548", "Foldchange_648"), "stripe", "none")
+
+
+my_theme <- theme(
+  axis.title.x = element_text(size = 10),
+  axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
+  axis.title.y = element_text(size = 10),
+  axis.text.y = element_text(size = 10),
+  plot.title = element_text(size = 15),
+  strip.text = element_text(size = 16),  
+  panel.background = element_rect(fill = "white", colour = "white"),
+  panel.grid.major.x = element_blank(),
+  panel.grid.minor.x = element_blank(),
+  panel.grid.major.y = element_line(color = "white"),
+  panel.grid.minor.y = element_line(color = "white"))
+
+
+Core_replisome2_T_bar_graph<- ggplot(melted_data_Core_replisome1_T, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_col(position = position_dodge(width = 1), width = 0.9,) +
+  geom_col_pattern(color = "black", 
+                   alpha = 0.7, aes(pattern = stripe),
+                   position = position_dodge(width = 1), width = 0.9, show.legend = FALSE) +
+  scale_pattern_identity() +
+    labs(x = "Gene symbols", y = "log2 Abundance Change",fill = "Foldchange") +
+    ggtitle("Core Replisome (1.T) ") +
+    scale_y_continuous(limits = c(-7, 3), breaks = seq(-7, 3, by = 1)) +
+    geom_vline(xintercept = seq(0.5, length(unique(melted_data_Core_replisome1_T$Gene)) - 0.5, by = 1), color = "grey8", size = 0.05) +
+    scale_fill_manual(values = c("Foldchange_524" = "orange", "Foldchange_624" = "orange4",
+                                 "Foldchange_548" = "lightgreen", "Foldchange_648" = "navyblue"),
+                      labels = c("clone 5 24 hours","clone6 24 hours", "clone5 48 hours",  "clone6 48 hours"))  +
+  
+    geom_hline(yintercept = c(0, 1, -1,2,3,-3,-2,-4,-5,-6,-7), linetype = "dashed", color = "grey50", size = 0.05) +
+    my_theme +
+    theme(legend.position = "right")+
+  guides(pattern = "none",
+         fill = guide_legend(override.aes = list(pattern = c("none", "none", "stripe", "stripe"))))
+
+
+print(Core_replisome2_T_bar_graph)
+
+
+
+```
+
+```{r}
+melted_data_Core_replisome1_T <- read_excel("Ipond melted_data_Core_replisome1_T.xlsx")
+melted_data_Core_replisome_T$Foldchange <- factor(
+  melted_data_Core_replisome_T$Foldchange,
+  levels=c("Foldchange_524", "Foldchange_624", "Foldchange_548", "Foldchange_648")
+)
+melted_data_Core_replisome_T$class <- ifelse(
+  melted_data_Core_replisome_T$Foldchange %in% c("Foldchange_524", "Foldchange_624"),
+  "Group 1", "Group 2"
+)
+melted_data_Core_replisome_T$Gene <- factor(melted_data_Core_replisome_T$Gene, levels = genes_ordered)
+melted_data_Core_replisome_T$Log2change[melted_data_Core_replisome_T$Log2change == Inf] <- 7
+melted_data_Core_replisome_T$Log2change[melted_data_Core_replisome_T$Log2change == -Inf] <- -7
+
+my_theme <- theme(
+  axis.title = element_text(size = 12, face="bold"),
+  axis.text.x = element_text(color="black", size = 10, angle = 45, hjust = 1),
+  axis.text.y = element_text(size = 10),
+  plot.title = element_text(size = 15, face="bold", hjust=.5),
+  strip.text = element_text(size = 16),
+  plot.margin = margin(1,1,1,1,"cm"),
+  panel.background = element_rect(fill = "white", colour = "white"),
+  panel.grid.major.x = element_blank(),
+  panel.grid.minor.x = element_blank(),
+  panel.grid.major.y = element_line(color = "white"),
+  panel.grid.minor.y = element_line(color = "white"))
+
+library(ggpattern)
+
+Core_replisome_Trinsic_bar_graph <- ggplot(melted_data_Core_replisome_T, aes(x=Gene, y=Log2change, fill=Foldchange, pattern=class)) +
+  geom_col_pattern(aes(fill=Foldchange, pattern=Foldchange),
+                   position = position_dodge(width=0.8), 
+                   colour   = 'black',
+                   width    = 0.7, 
+                   pattern_angle = 45,
+                   pattern_density = 0.01,
+                   pattern_spacing = 0.01,
+                   pattern_key_scale_factor = 0.6,
+                   pattern_colour = "black",
+                   pattern_fill = "black") +
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Core_replisome_T$Gene)) - 0.5, by = 1), color = "grey8", size = 0.05) +
+  geom_hline(yintercept = c(0, 1, -1,2,3,-3,-2,-4,-5,-6,-7), linetype = "dashed", color = "grey50", size = 0.05) +
+  scale_y_continuous(limits = c(-7, 3), breaks = seq(-7, 3, by = 1)) +  
+  scale_fill_manual(values=c("#8dc5e4", "#ffbb70", "#8dc5e4", "#ffbb70"),
+                    labels=c("Clone 5 24 hours", "Clone 6 24 hours", "Clone 5 48 hours", "Clone 6 48 hours")) +
+  scale_pattern_manual(values=c("Foldchange_524"="none", "Foldchange_624"="none",
+                                "Foldchange_548"="stripe", "Foldchange_648"="stripe")) +
+  labs(x = "Gene symbols", y = "log2 Abundance Change", fill = "Fold change",
+       title = "Core Replisome") +
+  my_theme +
+  theme(legend.position = "right") +
+  guides(pattern = "none",
+         fill = guide_legend(override.aes = list(pattern = c("none", "none", "stripe", "stripe"))))
+
+print(Core_replisome_Trinsic_bar_graph)
+
+
+ggsave( "pclip VS Trinsic Corereplisome.tiff", plot = Core_replisome_Trinsic_bar_graph, width = 10 , height =6, dpi = 600)
+
+
+```
+```{r}
+
+
+
+Core_replisome_Trinsic_bar_graph <- ggplot(melted_data_Core_replisome_T, aes(x=Gene, y=Log2change, fill=Foldchange, pattern=class)) +
+  geom_col_pattern(aes(fill=Foldchange, pattern=Foldchange),
+                   position = position_dodge(width=0.9),
+                   colour   = 'black',
+                   width    = 0.8,
+                   pattern_angle = 45,
+                   pattern_density = 0.1,
+                   pattern_spacing = 0.03,
+                   pattern_key_scale_factor = 0.5,
+                   pattern_colour = "black",
+                   pattern_fill = "black") +
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Core_replisome_T$Gene)) - 0.5, by = 1), color = "grey8", size = 0.05) +
+  geom_hline(yintercept = c(0, 1, -1, 2, 3, -3, -2, -4, -5, -6, -7), linetype = "dashed", color = "grey50", size = 0.05) +
+  scale_y_continuous(limits = c(-7, 3), breaks = seq(-7, 3, by = 1)) +  
+  scale_fill_manual(values=c("#8dc5e4", "#ffbb70", "#8dc5e4", "#ffbb70"),
+                    labels=c("Clone 5 24 hours", "Clone 6 24 hours", "Clone 5 48 hours", "Clone 6 48 hours")) +
+  scale_pattern_manual(values=c("Foldchange_524"="none", "Foldchange_624"="none",
+                                "Foldchange_548"="stripe", "Foldchange_648"="stripe")) +
+  labs(x = "Gene symbols", y = "log2 Abundance Change", fill = "Fold change",
+       title = "Core Replisome") +
+  my_theme +
+  theme(legend.position = "right") +
+  guides(pattern = "none",
+         fill = guide_legend(override.aes = list(pattern = c("none", "none", "stripe", "stripe")))) +
+  coord_flip() # This line flips the coordinates
+
+print(Core_replisome_Trinsic_bar_graph)
+
+
+ggsave( "pclip VS Trinsic Corereplisome.tiff", plot = Core_replisome_Trinsic_bar_graph, width = 6 , height =10, dpi = 600)
+
+```
+
+
+ggsave( "pclip VS Trinsic Corereplisome.tiff", plot = Core_replisome_Trinsic_bar_graph, width = 6 , height =10, dpi = 600)
+
+
+
+
+
+```{r}
+melted_data_Core_replisome1_T <- read_excel("Ipond melted_data_Core_replisome1_T.xlsx")
+melted_data_Core_replisome1_T$Foldchange <- factor(
+  melted_data_Core_replisome1_T$Foldchange,
+  levels=c("Foldchange_524", "Foldchange_624", "Foldchange_548", "Foldchange_648")
+)
+melted_data_Core_replisome1_T$class <- ifelse(
+  melted_data_Core_replisome1_T$Foldchange %in% c("Foldchange_524", "Foldchange_624"),
+  "Group 1", "Group 2"
+)
+
+
+my_theme <- theme(
+  axis.title = element_text(size = 12, face="bold"),
+  axis.text.x = element_text(color="black", size = 10, angle = 45, hjust = 1),
+  axis.text.y = element_text(size = 10),
+  plot.title = element_text(size = 15, face="bold", hjust=.5),
+  strip.text = element_text(size = 16),
+  plot.margin = margin(1,1,1,1,"cm"),
+  panel.background = element_rect(fill = "white", colour = "white"),
+  panel.grid.major.x = element_blank(),
+  panel.grid.minor.x = element_blank(),
+  panel.grid.major.y = element_line(color = "white"),
+  panel.grid.minor.y = element_line(color = "white"))
+
+ggplot(melted_data_Core_replisome1_T, aes(x=Gene, y=Log2change, fill=Foldchange, pattern=class)) +
+  geom_col_pattern(aes(fill=Foldchange, pattern=Foldchange),
+                   position = position_dodge(width=1),
+                   colour   = 'black',
+                   width    = 0.9,
+                   pattern_angle = 45,
+                   pattern_density = 0.3,
+                   pattern_spacing = 0.015,
+                   pattern_key_scale_factor = 0.6,
+                   pattern_colour = "white",
+                   pattern_fill = "white") +
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Core_replisome1_T$Gene)) - 0.5, by = 1), color = "grey8", size = 0.05) +
+  geom_hline(yintercept = c(0, 1, -1,2,3,-3,-2,-4,-5,-6,-7), linetype = "dashed", color = "grey50", size = 0.05) +
+  scale_y_continuous(limits = c(-7, 3), breaks = seq(-7, 3, by = 1)) +  
+  scale_fill_manual(values=c("#ea7f1b", "#8dc5e4", "#ea7f1b", "#8dc5e4"),
+                    labels=c("Clone 5 24 hours", "Clone6 24 hours", "Clone5 48 hours", "Clone6 48 hours")) +
+  scale_pattern_manual(values=c("Foldchange_524"="none", "Foldchange_624"="none",
+                                "Foldchange_548"="stripe", "Foldchange_648"="stripe")) +
+  labs(x = "Gene symbols", y = "log2 Abundance Change", fill = "Fold change",
+       title = "Core Replisome (1.T)") +
+  my_theme +
+  theme(legend.position = "right") +
+  guides(pattern = "none",
+         fill = guide_legend(override.aes = list(pattern = c("none", "none", "stripe", "stripe"))))
+
+
+
+
+```
+
+
+### Load Themes and library for graphs
+
+```{r}
+library(ggplot2)
+library(tidyr)
+
+my_theme <- theme(
+  axis.title.x = element_text(size = 10),
+  axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
+  axis.title.y = element_text(size = 10),
+  axis.text.y = element_text(size = 10),
+  plot.title = element_text(size = 15),
+  strip.text = element_text(size = 16),  
+  panel.background = element_rect(fill = "white", colour = "white"),
+  panel.grid.major.x = element_blank(),
+  panel.grid.minor.x = element_blank(),
+  panel.grid.major.y = element_line(color = "white"),
+  panel.grid.minor.y = element_line(color = "white"))
+
+```
+
+### bar graph for Topoisomerase , histone , chromatin remodellers and replisomes 
+
+```{r}
+melted_data_Topoisomerase <- pivot_longer(Topoisomerase, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+melted_data_Topoisomerase$Log2change[is.infinite(melted_data_Topoisomerase$Log2change)] <- 3
+
+
+Topoisomerase_bar_graph <- ggplot(melted_data_Topoisomerase, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), alpha = 0.9) +
+  labs(x = "Gene symbols", y = "log2 Abundance Change", fill= "colour") +
+  ggtitle("Topoisomerase") +
+  scale_y_continuous(limits = c(-2, 1), breaks = seq(-2, 1, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_524" = "red", "Foldchange_624" = "blue", "Foldchange_548" = "red4", "Foldchange_648" = "navyblue"),
+                    labels = c("clone 5 24 hours", "clone6 24 hours", "clone5 48 hours", "clone6 48 hours")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Topoisomerase$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) + geom_hline(yintercept = c(0, 1, -1,-2), linetype = "dashed", color = "black") +  
+  my_theme
+
+print (Topoisomerase_bar_graph)
+
+melted_data_Chromatin <- pivot_longer(Chromatin_remodeller, cols = starts_with("Foldchange"), 
+                                      names_to = "Foldchange", values_to = "Log2change")
+
+
+Chromatin_bar_graph <- ggplot(melted_data_Chromatin , aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), alpha = 0.9) +
+  labs(x = "Gene symbols", y = "log2 Abundance Change", fill= "colour") +
+  ggtitle("Chromatin remodellers") +
+  scale_y_continuous(limits = c(-4, 5), breaks = seq(-4, 5, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_524" = "red", "Foldchange_624" = "blue", "Foldchange_548" = "red4", "Foldchange_648" = "navyblue"),
+                    labels = c("clone 5 24 hours", "clone6 24 hours", "clone5 48 hours", "clone6 48 hours")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Chromatin$Gene)) - 0.5, by = 1), color = "grey", size = 0.5) + geom_hline(yintercept = c(-3,0, 1,2,3,4, -1,-2), linetype = "dashed", color = "black", size = 0.5) +  
+  my_theme
+
+
+print(Chromatin_bar_graph)
+
+
+
+melted_data_Replisome <- pivot_longer(Replisome, cols = starts_with("Foldchange"), 
+                                  names_to = "Foldchange", values_to = "Log2change")
+
+melted_data_Replisome$Log2change[is.infinite(melted_data_Replisome$Log2change) & melted_data_Replisome$Log2change == -Inf] <- -2.5
+
+
+Replisome_bar_graph <- ggplot(melted_data_Replisome, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.8), alpha = 0.9) +
+  labs(x = "Gene symbols", y = "log2 Abundance Change", fill= "colour") +
+  ggtitle("Replisomes") +
+  scale_y_continuous(limits = c(-4, 3), breaks = seq(-4, 3, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_524" = "red", "Foldchange_624" = "blue", "Foldchange_548" = "red4", "Foldchange_648" = "navyblue"),
+                    labels = c("clone 5 24 hours", "clone6 24 hours", "clone5 48 hours", "clone6 48 hours")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Chromatin$Gene)) - 0.5, by = 1), color = "grey", size = 0.8) + geom_hline(yintercept = c(-3,0, 1,2,-1,-2), linetype = "dashed", color = "black", size = 0.5) +  
+  my_theme
+
+print(Replisome_bar_graph)
+
+melted_data_Histone <- pivot_longer(Histones, cols = starts_with("Foldchange"), 
+                                      names_to = "Foldchange", values_to = "Log2change")
+
+melted_data_Histone$Gene[melted_data_Histone$Gene == "H4C1; H4C11; H4C12; H4C13; H4C14; H4C15; H4C16; H4C2; H4C3; H4C4; H4C5; H4C6; H4C8; H4C9"] <- "H4 Family"
+
+melted_data_Histone$Log2change[is.infinite(melted_data_Histone$Log2change) & melted_data_Histone$Log2change == -Inf] <- -2
+
+
+Histone_bar_graph <- ggplot(melted_data_Histone , aes(x = Gene, y = Log2change, fill = Foldchange)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.8), alpha = 0.9) +
+  labs(x = "Gene symbols", y = "log2 Abundance Change", fill= "colour") +
+  ggtitle("Histones") +
+  scale_y_continuous(limits = c(-2,3), breaks = seq(-2, 3, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_524" = "red", "Foldchange_624" = "blue", "Foldchange_548" = "red4", "Foldchange_648" = "navyblue"),
+                    labels = c("clone 5 24 hours", "clone6 24 hours", "clone5 48 hours", "clone6 48 hours")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Chromatin$Gene)) - 0.5, by = 1), color = "grey", size = 0.8) + geom_hline(yintercept = c(0, 1,2, -1,-2), linetype = "dashed", color = "black", size = 0.5) +  
+  my_theme
+
+print(Histone_bar_graph)
+
+```
+  
+
+### bar graph for signle gene
+
+```{r}
+
+my_theme2 <- theme(
+  axis.title.x = element_text(size = 16),
+  axis.text.x = element_text(size = 15, angle = 45, hjust = 1),
+  axis.title.y = element_text(size = 16),
+  axis.text.y = element_text(size = 16),
+  plot.title = element_text(size = 22),
+  strip.text = element_text(size = 16)
+  )
+
+PCNA1 <- c("PCNA")
+PCNA <- subset(tablesummary, Gene %in% PCNA1)
+View(PCNA )
+
+melted_data_PCNA <- pivot_longer(PCNA, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+
+PCNA_bar_graph <- ggplot(melted_data_PCNA, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.9) +
+    labs(x = "Gene symbol", y = "log2 Abundance Change", fill= "colour") +
+  ggtitle("PCNA") +
+  scale_y_continuous(limits = c(-3, 1), breaks = seq(-3, 1, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_524" = "red", "Foldchange_624" = "blue", "Foldchange_548" = "red4", "Foldchange_648" = "navyblue"),
+                    labels = c("clone 5 24 hours", "clone6 24 hours", "clone5 48 hours", "clone6 48 hours")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Activefork_markers$Gene)) - 0.5, by = 1), color = "grey", size = 0.8) + geom_hline(yintercept = c(0, 1, -1,-2), linetype = "dashed", color = "black", size = 0.5) +  
+  my_theme2
+
+
+PCNA_bar_graph
+
+POLA21 <- c("POLA2")
+POLA2 <- subset(tablesummary, Gene %in% POLA21)
+View(POLA2 )
+
+melted_data_POLA2 <- pivot_longer(POLA2, cols = starts_with("Foldchange"), 
+                            names_to = "Foldchange", values_to = "Log2change")
+
+
+POLA2_bar_graph <- ggplot(melted_data_POLA2, aes(x = Gene, y = Log2change, fill = Foldchange)) +
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.9) +
+    labs(x = "Gene symbol", y = "log2 Abundance Change", fill= "colour") +
+  ggtitle("POLA2") +
+  scale_y_continuous(limits = c(-4, 3), breaks = seq(-4, 3, by = 1)) +  
+  scale_fill_manual(values = c("Foldchange_524" = "red", "Foldchange_624" = "blue", "Foldchange_548" = "red4", "Foldchange_648" = "navyblue"),
+                    labels = c("clone 5 24 hours", "clone6 24 hours", "clone5 48 hours", "clone6 48 hours")) + 
+  geom_vline(xintercept = seq(0.5, length(unique(melted_data_Activefork_markers$Gene)) - 0.5, by = 1), color = "grey", size = 0.8) + geom_hline(yintercept = c(0, 1, -1,-2), linetype = "dashed", color = "black", size = 0.5) +  
+  my_theme2
+
+POLA2_bar_graph
+```
+
+### heat map fro histone , chromatin remodeller, replisome and topoisomerase 
+
+```{r}
+install.packages("gplots")
+library(gplots)
+install.packages("plotly")
+library(plotly)
+install.packages("reshape2")
+library(reshape2)
+library(dplyr)
+library(knitr)
+```
+
+
+```{r}
+
+
+custom_color_palette <- colorRampPalette(c( "purple", "blue",  "white", "orange", "red"))(n = 100)
+
+
+ggplot(melted_data_Topoisomerase, aes(x = Foldchange, y = Gene)) +
+  geom_tile(aes(fill = Log2change), colour = "white") +
+  scale_fill_gradientn(colors = custom_color_palette, limits = c(-5, 5)) +  # Adjust limits as needed
+  theme_minimal() + ggtitle("Topoisomerase")+
+  labs(x = "Foldchanges", y = " Genes")
+
+ggplot(melted_data_Histone, aes(x = Foldchange, y = Gene)) +
+  geom_tile(aes(fill = Log2change), colour = "white") +
+  scale_fill_gradientn(colors = custom_color_palette, limits = c(-5, 5)) +  # Adjust limits as needed
+  theme_minimal() + ggtitle("Histone")+
+  labs(x = "Foldchanges", y = " Genes")
+
+ggplot(melted_data_Chromatin, aes(x = Foldchange, y = Gene)) +
+  geom_tile(aes(fill = Log2change), colour = "white") +
+  scale_fill_gradientn(colors = custom_color_palette, limits = c(-5, 5)) +  # Adjust limits as needed
+  theme_minimal() + ggtitle("Chromatin Remodeller")+
+  labs(x = "Foldchanges", y = " Genes")
+
+ggplot(melted_data_Replisome, aes(x = Foldchange, y = Gene)) +
+  geom_tile(aes(fill = Log2change), colour = "white") +
+  scale_fill_gradientn(colors = custom_color_palette, limits = c(-5, 5)) +  # Adjust limits as needed
+  theme_minimal() + ggtitle("Replisome")+
+  labs(x = "Foldchanges", y = " Genes")
+ 
+```
+
+
+
+
+
+### Select top 30 hit increase or decrease genes 
+
+```{r}
+
+
+sorted_df_524 <- tablesummary %>% arrange(desc(Foldchange_524))
+
+top_30_characters_524 <- head(sorted_df_524$Gene, 30)
+
+gene_table <- data.frame(Gene_Name = sorted_df_524$Gene, Foldchange_524 = sorted_df_524$Foldchange_524)
+kable(gene_table, align = c("l", "r"), caption = "Top 30 increased Genes by Foldchange_524")
+
+
+
+sorted_df_624 <- tablesummary %>% arrange(desc(Foldchange_624))
+
+top_30_characters_624 <- head(sorted_df_624$Gene, 30)
+
+gene_table <- data.frame(Gene_Name = sorted_df_624$Gene, Foldchange_624 = sorted_df_624$Foldchange_624)
+kable(gene_table, align = c("l", "r"), caption = "Top 30 increased Genes by Foldchange_624")
+
+sorted_df_548 <- tablesummary %>% arrange(desc(Foldchange_548))
+
+top_30_characters_548 <- head(sorted_df_548$Gene, 30)
+
+gene_table <- data.frame(Gene_Name = sorted_df_548$Gene, Foldchange_548 = sorted_df_548$Foldchange_548)
+kable(gene_table, align = c("l", "r"), caption = "Top 30 increased Genes by Foldchange_548")
+
+sorted_df_648 <- tablesummary %>% arrange(desc(Foldchange_648))
+
+top_30_characters_648 <- head(sorted_df_648$Gene, 30)
+
+gene_table <- data.frame(Gene_Name = sorted_df_648$Gene, Foldchange_648 = sorted_df_648$Foldchange_648)
+kable(gene_table, align = c("l", "r"), caption = "Top 30 increased Genes by Foldchange_648")
+
+```
+
+### Select top 30 hit decrease genes 
+
+```{r}
+
+
+sorted_df_524 <- tablesummary %>% arrange(Foldchange_524)
+
+top_30_smallest_genes524 <- head(sorted_df_524$Gene, 30)
+
+gene_table <- data.frame(Gene_Name = sorted_df_524$Gene, Foldchange_524 = sorted_df_524$Foldchange_524)
+kable(gene_table, align = c("l", "r"), caption = "Top 30 decreased Genes by Foldchange_524")
+
+
+
+sorted_df_624 <- tablesummary %>% arrange(Foldchange_624)
+
+top_30_smallest_genes624 <- head(sorted_df_624$Gene, 30)
+
+gene_table <- data.frame(Gene_Name = sorted_df_624$Gene, Foldchange_624 = sorted_df_624$Foldchange_624)
+kable(gene_table, align = c("l", "r"), caption = "Top 30 decreased Genes by Foldchange_624")
+
+sorted_df_548 <- tablesummary %>% arrange(Foldchange_548)
+
+top_30_smallest_genes548 <- head(sorted_df_548$Gene, 30)
+
+gene_table <- data.frame(Gene_Name = sorted_df_548$Gene, Foldchange_548 = sorted_df_548$Foldchange_548)
+kable(gene_table, align = c("l", "r"), caption = "Top 30 decreased Genes by Foldchange_548")
+
+sorted_df_648 <- tablesummary %>% arrange(Foldchange_648)
+
+top_30_smallest_genes648 <- head(sorted_df_648$Gene, 30)
+
+gene_table <- data.frame(Gene_Name = sorted_df_648$Gene, Foldchange_648 = sorted_df_648$Foldchange_648)
+kable(gene_table, align = c("l", "r"), caption = "Top 30 decreased Genes by Foldchange_648")
+
+
+
+```
+
+```{r}
+filtered_data_48hdecrease <- tablesummary %>% filter(Foldchange_524 < -0.58 & Foldchange_624 < -0.58)
+selected_genes48hdecrease <- unique(filtered_data_48hdecrease$Gene)
+subset_data_48hdecrease <- filtered_data_48hdecrease %>% filter(Gene %in%selected_genes48hdecrease)
+kable(subset_data_48hdecrease[, c("Gene", "Foldchange_548", "Foldchange_648")], align = c("l", "r", "r"), caption = "Selected Genes with Foldchange Values in 48h")
+
+
+```
+
+
+```{r}
+
+filtered_data_24h <- tablesummary %>% filter(Foldchange_524 > 1 & Foldchange_624 > 1)
+selected_genes24h <- unique(filtered_data_24h$Gene)
+subset_data_24h <- filtered_data_24h %>% filter(Gene %in% selected_genes24h)
+kable(subset_data_24h[, c("Gene", "Foldchange_524", "Foldchange_624")], align = c("l", "r", "r"), caption = "Selected Genes with Foldchange Values in 24h")
+
+filtered_data_48h <- tablesummary %>% filter(Foldchange_548 > 1 & Foldchange_648 > 1)
+selected_genes48h <- unique(filtered_data_48h$Gene)
+subset_data_48h <- filtered_data_48h %>% filter(Gene %in% selected_genes48h)
+kable(subset_data_48h[, c("Gene", "Foldchange_548", "Foldchange_648")], align = c("l", "r", "r"), caption = "Selected Genes with Foldchange Values in 48h")
+
+
+filtered_data_24hdecrease <- tablesummary %>% filter(Foldchange_524 < -1 & Foldchange_624 < -1)
+selected_genes24hdecrease <- unique(filtered_data_24hdecrease$Gene)
+subset_data_24hdecrease <- filtered_data_24hdecrease %>% filter(Gene %in% selected_genes24hdecrease)
+kable(subset_data_24hdecrease[, c("Gene", "Foldchange_524", "Foldchange_624")], align = c("l", "r", "r"), caption = "Selected Genes with Foldchange Values in 24h")
+
+filtered_data_48hdecrease <- tablesummary %>% filter(Foldchange_548 < -1 & Foldchange_648 < -1)
+selected_genes48hdecrease <- unique(filtered_data_48hdecrease$Gene)
+subset_data_48hdecrease <- filtered_data_48hdecrease %>% filter(Gene %in%selected_genes48hdecrease)
+kable(subset_data_48hdecrease[, c("Gene", "Foldchange_548", "Foldchange_648")], align = c("l", "r", "r"), caption = "Selected Genes with Foldchange Values in 48h")
+
+write_xlsx(subset_data_48hdecrease, "C:\\Users\\Junqi Pan\\OneDrive\\Desktop\\Ipond subset_data_48hdecrease.xlsx")
+```
+
+### Select genes with fold change >1 <-1 in 24h and 48 h 
+
+```{r}
+
+
+filtered_data <- tablesummary %>% filter(Foldchange_524 > 1 & Foldchange_624 > 1 & Foldchange_548 > 1 & Foldchange_648 > 1)
+selected_genes <- unique(filtered_data$Gene)
+subset_data <- filtered_data %>% filter(Gene %in% selected_genes)
+kable(subset_data[, c("Gene", "Foldchange_524", "Foldchange_624","Foldchange_548", "Foldchange_648")], align = c("l", "r", "r"), caption = "Selected Genes with Foldchange Values >1 ")
+
+filtered_data <- tablesummary %>% filter(Foldchange_524 > 0.5 & Foldchange_624 > 0.5 & Foldchange_548 > 0.5 & Foldchange_648 > 0.5)
+selected_genes <- unique(filtered_data$Gene)
+subset_data <- filtered_data %>% filter(Gene %in% selected_genes)
+kable(subset_data[, c("Gene", "Foldchange_524", "Foldchange_624","Foldchange_548", "Foldchange_648")], align = c("l", "r", "r"), caption = "Selected Genes with Foldchange Values >0.5 ")
+
+```
+
+### Select genes with fold change > 0.7 in 24h and 48 h 
+```{r}
+install.packages(knitr)
+library(knitr)
+
+filtered_data_24h <- tablesummary %>% filter(Foldchange_524 > 0.5 & Foldchange_624 > 0.5)
+selected_genes24h <- unique(filtered_data_24h$Gene)
+subset_data_24h <- filtered_data_24h %>% filter(Gene %in% selected_genes24h)
+kable(subset_data_24h[, c("Gene", "Foldchange_524", "Foldchange_624")], align = c("l", "r", "r"), caption = "Selected Genes with Foldchange Values in 24h")
+
+filtered_data_48h <- tablesummary %>% filter(Foldchange_548 > 0.5 & Foldchange_648 > 0.5)
+selected_genes48h <- unique(filtered_data_48h$Gene)
+subset_data_48h <- filtered_data_48h %>% filter(Gene %in% selected_genes48h)
+kable(subset_data_48h[, c("Gene", "Foldchange_548", "Foldchange_648")], align = c("l", "r", "r"), caption = "Selected Genes with Foldchange Values in 48h")
+
+```
+
+### https://www.rpubs.com/Knight95/volcano
+
+```{r}
+library(knitr)
+filtered_data_24h <- tablesummary %>% filter(Foldchange_524 > 0 )
+selected_genes24h <- unique(filtered_data_24h$Gene)
+subset_data_24hclone5 <- filtered_data_24h %>% filter(Gene %in% selected_genes24h)
+kable(subset_data_24hclone5[, c("Gene", "Foldchange_524")], align = c("l", "r"), caption = "Selected Genes with Foldchange Values in 24h")
+
+filtered_data_48h <- tablesummary %>% filter(Foldchange_624 > 0)
+selected_genes48h <- unique(filtered_data_48h$Gene)
+subset_data_24hclone6 <- filtered_data_48h %>% filter(Gene %in% selected_genes48h)
+kable(subset_data_24hclone6[, c("Gene",  "Foldchange_624")], align = c("l", "r"), caption = "Selected Genes with Foldchange Values in 48h")
+
+
+write_xlsx(subset_data_24hclone5, "C:\\Users\\Junqi Pan\\OneDrive\\Desktop\\Ipond protein enriched in Clone5 at 24h.xlsx")
+write_xlsx(subset_data_24hclone6, "C:\\Users\\Junqi Pan\\OneDrive\\Desktop\\Ipond protein enriched in Clone6 at 24h.xlsx")
+
+
+```
+
+### 
+
+```{r}
+
+```
+
+### 
+
+```{r}
+
+```
+
+### 
+
+```{r}
+
+```
+
+### 
+
+```{r}
+
+```
+
+### 
+
+```{r}
+Framingham_Died <- subset(Framingham, Alive_at_examination_16 == 0)
+
+
+```
+
+### 
+
+```{r}
+
+```
+
+### 
+
+```{r}
+
+```
